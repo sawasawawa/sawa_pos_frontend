@@ -74,3 +74,4 @@ jobs:
           package: ./deploy.zip       # ← ZIP をそのまま渡す
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_110A8B7038114DDA93FBF9F6FF08A8A0 }}
 
+
