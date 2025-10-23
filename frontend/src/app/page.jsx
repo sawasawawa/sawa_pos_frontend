@@ -25,9 +25,9 @@ export default function POSApp() {
     setCurrentItem(null);
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || 'http://localhost:8000';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || '/api';
       console.log('API Base URL:', apiBaseUrl);
-      const response = await fetch(`${apiBaseUrl}/api/items/${itemCode}`);
+      const response = await fetch(`${apiBaseUrl}/items/${itemCode}`);
       if (response.ok) {
         const data = await response.json();
         setCurrentItem(data);
@@ -97,8 +97,8 @@ export default function POSApp() {
     setError('');
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || 'http://localhost:8000';
-      const response = await fetch(`${apiBaseUrl}/api/purchase`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || '/api';
+      const response = await fetch(`${apiBaseUrl}/purchase`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
