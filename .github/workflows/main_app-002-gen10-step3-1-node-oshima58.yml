@@ -5,6 +5,10 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: app-002-gen10-step3-1-node-oshima58
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,6 +29,17 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
+      # npm のキャッシュディレクトリを確実に作成（キャッシュ警告の抑止）
+      - name: Ensure npm cache dir exists
+        run: |
+          npm config set cache ~/.npm --global
+          mkdir -p ~/.npm
+
+      # lockfile の存在を事前チェック（無ければ理由を明示して失敗）
+      - name: Check lockfile
+        run: |
+          test -f package-lock.json && echo "LOCK OK" || (echo "frontend/package-lock.json is missing" && exit 1)
+
       - name: npm ci / build
         env:
           NEXT_PUBLIC_API_ENDPOINT: ${{ secrets.NEXT_PUBLIC_API_ENDPOINT }}
@@ -33,12 +48,12 @@ jobs:
           npm ci
           npm run build
 
-      # 🔸 Next の standalone 生成物を wwwroot 直下に置ける形に整える
+      # Next の standalone 出力を wwwroot 直下に置ける形へ（親フォルダを含めない）
       - name: Prepare deploy artifact (standalone)
         run: |
           rm -rf deploy
           mkdir -p deploy/.next
-          # standalone の実行に必要なファイル群を deploy 直下へ
+          # 実行に必要な本体
           cp -r .next/standalone/* ./deploy/
           # 静的ファイル
           if [ -d ".next/static" ]; then
@@ -50,7 +65,7 @@ jobs:
             cp -r public ./deploy/public
           fi
 
-      # 🔸 ZIP の中に「deploy/」という親フォルダを入れない（中身だけを圧縮）
+      # 親フォルダ名なしで中身だけをZIP化 → wwwroot 直下に server.js が展開される
       - name: Zip deploy artifact (contents only)
         run: |
           cd deploy
@@ -61,6 +76,7 @@ jobs:
         with:
           name: node-app
           path: deploy.zip
+          retention-days: 7
 
   deploy:
     runs-on: ubuntu-latest
@@ -85,5 +101,4 @@ jobs:
           slot-name: 'Production'
           package: ./deploy.zip
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_110A8B7038114DDA93FBF9F6FF08A8A0 }}
-
 
