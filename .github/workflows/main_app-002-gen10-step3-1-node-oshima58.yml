@@ -29,13 +29,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      # npm のキャッシュディレクトリを確実に作成（キャッシュ警告の抑止）
       - name: Ensure npm cache dir exists
         run: |
           npm config set cache ~/.npm --global
           mkdir -p ~/.npm
 
-      # lockfile の存在を事前チェック（無ければ理由を明示して失敗）
       - name: Check lockfile
         run: |
           test -f package-lock.json && echo "LOCK OK" || (echo "frontend/package-lock.json is missing" && exit 1)
@@ -48,24 +46,19 @@ jobs:
           npm ci
           npm run build
 
-      # Next の standalone 出力を wwwroot 直下に置ける形へ（親フォルダを含めない）
       - name: Prepare deploy artifact (standalone)
         run: |
           rm -rf deploy
           mkdir -p deploy/.next
-          # 実行に必要な本体
           cp -r .next/standalone/* ./deploy/
-          # 静的ファイル
           if [ -d ".next/static" ]; then
             mkdir -p ./deploy/.next
             cp -r .next/static ./deploy/.next/static
           fi
-          # public（あれば）
           if [ -d "public" ]; then
             cp -r public ./deploy/public
           fi
 
-      # 親フォルダ名なしで中身だけをZIP化 → wwwroot 直下に server.js が展開される
       - name: Zip deploy artifact (contents only)
         run: |
           cd deploy
@@ -101,4 +94,5 @@ jobs:
           slot-name: 'Production'
           package: ./deploy.zip
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_110A8B7038114DDA93FBF9F6FF08A8A0 }}
+
 
