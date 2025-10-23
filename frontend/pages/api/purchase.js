@@ -10,65 +10,48 @@ export default async function handler(req, res) {
   }
 
   try {
-    // SQLiteデータベースを使用（better-sqlite3）
-    const Database = require('better-sqlite3');
+    // SQLiteデータベースを使用（sql.js）
+    const initSqlJs = require('sql.js');
+    const fs = require('fs');
     const path = require('path');
 
     const dbPath = path.join(process.cwd(), 'db_control', 'CRM.db');
-    const db = new Database(dbPath);
+    const filebuffer = fs.readFileSync(dbPath);
+    const SQL = await initSqlJs();
+    const db = new SQL.Database(filebuffer);
 
-    // トランザクション開始
-    const insertPurchase = db.prepare(`
-      INSERT INTO purchases (purchase_id, customer_id, purchase_date, total_amount)
-      VALUES (?, ?, ?, ?)
-    `);
+    // 購入IDを生成
+    const purchaseId = 'P' + Date.now().toString();
+    const customerId = 'C001'; // デフォルト顧客
+    const purchaseDate = new Date().toISOString().split('T')[0];
 
-    const insertPurchaseDetail = db.prepare(`
-      INSERT INTO purchase_details (detail_id, purchase_id, item_id, quantity, unit_price, subtotal)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
+    let totalAmount = 0;
 
-    const updatePurchaseTotal = db.prepare(`
-      UPDATE purchases SET total_amount = ? WHERE purchase_id = ?
-    `);
+    // 購入詳細を処理
+    items.forEach((item, index) => {
+      const detailId = purchaseId + '_' + (index + 1).toString().padStart(2, '0');
+      const subtotal = item.price * item.quantity;
+      totalAmount += subtotal;
 
-    const transaction = db.transaction(() => {
-      // 購入IDを生成
-      const purchaseId = 'P' + Date.now().toString();
-      const customerId = 'C001'; // デフォルト顧客
-      const purchaseDate = new Date().toISOString().split('T')[0];
-
-      let totalAmount = 0;
-
-      // 購入詳細を処理
-      items.forEach((item, index) => {
-        const detailId = purchaseId + '_' + (index + 1).toString().padStart(2, '0');
-        const subtotal = item.price * item.quantity;
-        totalAmount += subtotal;
-
-        insertPurchaseDetail.run(
-          detailId,
-          purchaseId,
-          item.item_id,
-          item.quantity,
-          item.price,
-          subtotal
-        );
-      });
-
-      // 購入レコードを作成
-      insertPurchase.run(purchaseId, customerId, purchaseDate, totalAmount);
-
-      return { purchaseId, totalAmount };
+      // 購入詳細を挿入
+      db.run(
+        'INSERT INTO purchase_details (detail_id, purchase_id, item_id, quantity, unit_price, subtotal) VALUES (?, ?, ?, ?, ?, ?)',
+        [detailId, purchaseId, item.item_id, item.quantity, item.price, subtotal]
+      );
     });
 
-    const result = transaction();
+    // 購入レコードを作成
+    db.run(
+      'INSERT INTO purchases (purchase_id, customer_id, purchase_date, total_amount) VALUES (?, ?, ?, ?)',
+      [purchaseId, customerId, purchaseDate, totalAmount]
+    );
+
     db.close();
 
     res.status(200).json({
       message: "購入が完了しました",
-      purchase_id: result.purchaseId,
-      total_amount: result.totalAmount
+      purchase_id: purchaseId,
+      total_amount: totalAmount
     });
 
   } catch (error) {

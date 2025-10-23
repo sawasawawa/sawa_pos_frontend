@@ -6,28 +6,33 @@ export default async function handler(req, res) {
 
   const { itemCode } = req.query;
 
-          try {
-            // SQLiteデータベースを使用（better-sqlite3）
-            const Database = require('better-sqlite3');
-            const path = require('path');
+  try {
+    // SQLiteデータベースを使用（sql.js）
+    const initSqlJs = require('sql.js');
+    const fs = require('fs');
+    const path = require('path');
 
-            const dbPath = path.join(process.cwd(), 'db_control', 'CRM.db');
-            const db = new Database(dbPath);
+    const dbPath = path.join(process.cwd(), 'db_control', 'CRM.db');
+    const filebuffer = fs.readFileSync(dbPath);
+    const SQL = await initSqlJs();
+    const db = new SQL.Database(filebuffer);
 
-            const stmt = db.prepare('SELECT item_id, item_name, price FROM items WHERE item_id = ?');
-            const row = stmt.get(itemCode);
+    const stmt = db.prepare('SELECT item_id, item_name, price FROM items WHERE item_id = ?');
+    const result = stmt.getAsObject({ $item_id: itemCode });
 
-            db.close();
+    stmt.free();
+    db.close();
 
-            if (!row) {
-              return res.status(404).json({ detail: "商品がマスタ未登録です" });
-            }
+    if (!result.item_id) {
+      return res.status(404).json({ detail: "商品がマスタ未登録です" });
+    }
 
-            res.status(200).json({
-              item_id: row.item_id,
-              item_name: row.item_name,
-              price: row.price
-            });
+    res.status(200).json({
+      item_id: result.item_id,
+      item_name: result.item_name,
+      price: result.price
+    });
+
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ detail: "商品検索でエラーが発生しました" });
