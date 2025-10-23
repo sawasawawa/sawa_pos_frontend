@@ -24,7 +24,7 @@ jobs:
 
       - name: npm ci / build
         env:
-          NEXT_PUBLIC_API_ENDPOINT: https://app-002-gen10-step3-1-node-oshima58-backend.azurewebsites.net
+          NEXT_PUBLIC_API_ENDPOINT: https://app-002-gen10-step3-1-node-oshima58.azurewebsites.net
           NEXT_TELEMETRY_DISABLED: '1'
         run: |
           npm ci
