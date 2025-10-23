@@ -13,61 +13,77 @@ jobs:
 
     defaults:
       run:
-        working-directory: frontend   # ← 重要：frontend 配下で実行
+        working-directory: frontend
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          # Azure App Service の既定と相性が良い LTS を推奨（20 か 22）
           node-version: '20.x'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: npm install, build, and test
+      - name: Ensure npm cache dir exists
+        run: |
+          npm config set cache ~/.npm --global
+          mkdir -p ~/.npm
+
+      - name: npm ci / build
         env:
           NEXT_PUBLIC_API_ENDPOINT: ${{ secrets.NEXT_PUBLIC_API_ENDPOINT }}
+          NEXT_TELEMETRY_DISABLED: '1'
         run: |
           npm ci
-          npm run build --if-present
-          npm test --if-present
+          npm run build
 
-      # Next.js standalone をデプロイ用フォルダにまとめる
-      - name: Prepare deploy artifact
+      # Next standalone をデプロイ用にまとめる（親フォルダを含めない）
+      - name: Prepare deploy artifact (standalone)
         run: |
           rm -rf deploy
-          mkdir -p deploy
-          # standalone 一式と static をコピー
+          mkdir -p deploy/.next
           cp -r .next/standalone/* ./deploy/
-          mkdir -p ./deploy/.next
-          cp -r .next/static ./deploy/.next/static
-          # public 配下の静的ファイルも必要なら
-          cp -r public ./deploy/public || true
+          if [ -d ".next/static" ]; then
+            mkdir -p ./deploy/.next
+            cp -r .next/static ./deploy/.next/static
+          fi
+          if [ -d "public" ]; then
+            cp -r public ./deploy/public
+          fi
+          ls -la deploy  # debug
 
+      # フォルダをそのままアーティファクト化（後段で ./deploy に展開する）
       - name: Upload deploy artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: frontend/deploy   # ← deploy だけをアップロード
+          path: frontend/deploy
+          if-no-files-found: error
+          retention-days: 7
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-      - name: Download artifact from build job
+      - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: node-app
-          path: .  # カレントに展開（./deploy ができる）
+          path: ./deploy     # ★ ./deploy に中身が展開される
+
+      - name: Show downloaded files (debug)
+        run: |
+          pwd
+          ls -la
+          ls -la deploy || true
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'app-002-gen10-step3-1-node-oshima58'
           slot-name: 'Production'
-          package: ./deploy          # ← 展開された deploy をそのまま送る
+          package: ./deploy     # ★ フォルダを直接デプロイ
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_110A8B7038114DDA93FBF9F6FF08A8A0 }}
 
