@@ -1,4 +1,4 @@
 // frontend/next.config.mjs
 export default {
-    output: 'standalone',
-  }  
+  // Standard Next.js configuration for Azure App Service
+}  

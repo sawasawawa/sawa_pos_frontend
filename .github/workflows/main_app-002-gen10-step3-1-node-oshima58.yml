@@ -30,15 +30,24 @@ jobs:
           npm ci
           npm run build
 
-      - name: Prepare deploy artifact (Next standalone)
+      - name: Prepare deploy artifact (Standard Next.js)
         run: |
           rm -rf deploy
-          mkdir -p deploy/.next
-          cp -r .next/standalone/* ./deploy/
-          cp -r .next/static ./deploy/.next/static
-          cp -r public ./deploy/public || true
+          mkdir -p deploy
+          # Copy all necessary files for standard Next.js deployment
+          cp -r .next ./deploy/.next
+          cp -r public ./deploy/public
+          cp -r node_modules ./deploy/node_modules
+          cp package.json ./deploy/
+          cp package-lock.json ./deploy/
+          # Create start script
+          echo '#!/bin/sh' > ./deploy/start.sh
+          echo 'npm start' >> ./deploy/start.sh
+          chmod +x ./deploy/start.sh
           echo "📦 Contents of deploy:"
           ls -la deploy
+          echo "✅ Next.js build files:"
+          ls -la deploy/.next
 
       - name: Zip deploy contents (include hidden files)
         run: |
