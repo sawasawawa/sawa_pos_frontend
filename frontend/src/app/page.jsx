@@ -25,12 +25,20 @@ export default function POSApp() {
     setCurrentItem(null);
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || '/api';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || 'http://localhost:8000';
       console.log('API Base URL:', apiBaseUrl);
-      const response = await fetch(`${apiBaseUrl}/items/${itemCode}`);
+      const response = await fetch(`${apiBaseUrl}/api/product?code=${itemCode}`);
       if (response.ok) {
         const data = await response.json();
-        setCurrentItem(data);
+        if (data.product) {
+          setCurrentItem({
+            item_id: data.product.code,
+            item_name: data.product.name,
+            price: data.product.unit_price
+          });
+        } else {
+          setError('商品がマスタ未登録です');
+        }
       } else {
         const errorData = await response.json();
         setError(errorData.detail || '商品が見つかりません');
@@ -97,13 +105,20 @@ export default function POSApp() {
     setError('');
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || '/api';
-      const response = await fetch(`${apiBaseUrl}/purchase`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_ENDPOINT || 'http://localhost:8000';
+      const purchaseItems = cartItems.map(item => ({
+        product_code: item.item_id,
+        product_name: item.item_name,
+        unit_price: item.price,
+        quantity: item.quantity
+      }));
+      
+      const response = await fetch(`${apiBaseUrl}/api/purchase/commit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ items: cartItems }),
+        body: JSON.stringify({ items: purchaseItems }),
       });
 
       if (response.ok) {
