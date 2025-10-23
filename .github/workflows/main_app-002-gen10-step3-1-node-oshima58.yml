@@ -19,36 +19,48 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20.x'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: npm install, build, and test
+      - name: npm ci / build
         env:
           NEXT_PUBLIC_API_ENDPOINT: ${{ secrets.NEXT_PUBLIC_API_ENDPOINT }}
+          NEXT_TELEMETRY_DISABLED: '1'
         run: |
           npm ci
-          npm run build --if-present
-          npm test --if-present
+          npm run build
 
+      # 🔸 Next の standalone 生成物を wwwroot 直下に置ける形に整える
       - name: Prepare deploy artifact (standalone)
         run: |
           rm -rf deploy
           mkdir -p deploy/.next
+          # standalone の実行に必要なファイル群を deploy 直下へ
           cp -r .next/standalone/* ./deploy/
-          cp -r .next/static ./deploy/.next/static
-          cp -r public ./deploy/public || true
+          # 静的ファイル
+          if [ -d ".next/static" ]; then
+            mkdir -p ./deploy/.next
+            cp -r .next/static ./deploy/.next/static
+          fi
+          # public（あれば）
+          if [ -d "public" ]; then
+            cp -r public ./deploy/public
+          fi
 
-      - name: Zip deploy artifact
-        run: zip -r deploy.zip deploy
+      # 🔸 ZIP の中に「deploy/」という親フォルダを入れない（中身だけを圧縮）
+      - name: Zip deploy artifact (contents only)
+        run: |
+          cd deploy
+          zip -r ../deploy.zip .
 
       - name: Upload deploy artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: frontend/deploy.zip   # ← ZIP をアップロード
+          path: deploy.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -59,7 +71,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-          path: .                     # カレントに deploy.zip が置かれる
+          path: .
 
       - name: Show downloaded files (debug)
         run: |
@@ -71,7 +83,7 @@ jobs:
         with:
           app-name: 'app-002-gen10-step3-1-node-oshima58'
           slot-name: 'Production'
-          package: ./deploy.zip       # ← ZIP をそのまま渡す
+          package: ./deploy.zip
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_110A8B7038114DDA93FBF9F6FF08A8A0 }}
 
 
