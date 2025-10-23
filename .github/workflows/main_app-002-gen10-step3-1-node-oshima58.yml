@@ -38,6 +38,8 @@ jobs:
           cp -r .next ./deploy/.next
           cp -r public ./deploy/public
           cp -r node_modules ./deploy/node_modules
+          cp -r pages ./deploy/pages
+          cp -r db_control ./deploy/db_control
           cp package.json ./deploy/
           cp package-lock.json ./deploy/
           # Create start script
@@ -48,6 +50,8 @@ jobs:
           ls -la deploy
           echo "✅ Next.js build files:"
           ls -la deploy/.next
+          echo "✅ Database files:"
+          ls -la deploy/db_control
 
       - name: Zip deploy contents (include hidden files)
         run: |
