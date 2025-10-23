@@ -8,9 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     defaults:
       run:
         working-directory: frontend
@@ -25,11 +22,6 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Ensure npm cache dir exists
-        run: |
-          npm config set cache ~/.npm --global
-          mkdir -p ~/.npm
-
       - name: npm ci / build
         env:
           NEXT_PUBLIC_API_ENDPOINT: ${{ secrets.NEXT_PUBLIC_API_ENDPOINT }}
@@ -38,29 +30,30 @@ jobs:
           npm ci
           npm run build
 
-      # Next standalone をデプロイ用にまとめる（親フォルダを含めない）
-      - name: Prepare deploy artifact (standalone)
+      - name: Prepare deploy artifact (Next standalone)
         run: |
           rm -rf deploy
           mkdir -p deploy/.next
           cp -r .next/standalone/* ./deploy/
-          if [ -d ".next/static" ]; then
-            mkdir -p ./deploy/.next
-            cp -r .next/static ./deploy/.next/static
-          fi
-          if [ -d "public" ]; then
-            cp -r public ./deploy/public
-          fi
-          ls -la deploy  # debug
+          cp -r .next/static ./deploy/.next/static
+          cp -r public ./deploy/public || true
+          echo "📦 Contents of deploy:"
+          ls -la deploy
 
-      # フォルダをそのままアーティファクト化（後段で ./deploy に展開する）
+      - name: Zip deploy contents (include hidden files)
+        run: |
+          cd deploy
+          zip -r ../deploy.zip .
+          cd ..
+          echo "✅ deploy.zip created"
+          unzip -l deploy.zip | head -n 30
+
       - name: Upload deploy artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: frontend/deploy
+          path: deploy.zip
           if-no-files-found: error
-          retention-days: 7
 
   deploy:
     runs-on: ubuntu-latest
@@ -71,18 +64,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-          path: ./deploy     # ★ ./deploy に中身が展開される
-
-      - name: Show downloaded files (debug)
-        run: |
-          pwd
-          ls -la
-          ls -la deploy || true
+          path: .
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'app-002-gen10-step3-1-node-oshima58'
           slot-name: 'Production'
-          package: ./deploy     # ★ フォルダを直接デプロイ
+          package: ./deploy.zip
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_110A8B7038114DDA93FBF9F6FF08A8A0 }}
