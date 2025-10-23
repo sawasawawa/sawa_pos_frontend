@@ -5,10 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-concurrency:
-  group: app-002-gen10-step3-1-node-oshima58
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -34,10 +30,6 @@ jobs:
           npm config set cache ~/.npm --global
           mkdir -p ~/.npm
 
-      - name: Check lockfile
-        run: |
-          test -f package-lock.json && echo "LOCK OK" || (echo "frontend/package-lock.json is missing" && exit 1)
-
       - name: npm ci / build
         env:
           NEXT_PUBLIC_API_ENDPOINT: ${{ secrets.NEXT_PUBLIC_API_ENDPOINT }}
@@ -46,6 +38,7 @@ jobs:
           npm ci
           npm run build
 
+      # Next standalone をデプロイ用にまとめる（親フォルダを含めない）
       - name: Prepare deploy artifact (standalone)
         run: |
           rm -rf deploy
@@ -58,17 +51,15 @@ jobs:
           if [ -d "public" ]; then
             cp -r public ./deploy/public
           fi
+          ls -la deploy  # debug
 
-      - name: Zip deploy artifact (contents only)
-        run: |
-          cd deploy
-          zip -r ../deploy.zip .
-
+      # フォルダをそのままアーティファクト化（後段で ./deploy に展開する）
       - name: Upload deploy artifact
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: deploy.zip
+          path: frontend/deploy
+          if-no-files-found: error
           retention-days: 7
 
   deploy:
@@ -80,19 +71,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
-          path: .
+          path: ./deploy     # ★ ./deploy に中身が展開される
 
       - name: Show downloaded files (debug)
         run: |
           pwd
           ls -la
+          ls -la deploy || true
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'app-002-gen10-step3-1-node-oshima58'
           slot-name: 'Production'
-          package: ./deploy.zip
+          package: ./deploy     # ★ フォルダを直接デプロイ
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_110A8B7038114DDA93FBF9F6FF08A8A0 }}
-
 
