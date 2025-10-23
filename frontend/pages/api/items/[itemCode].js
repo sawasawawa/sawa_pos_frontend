@@ -7,26 +7,35 @@ export default async function handler(req, res) {
   const { itemCode } = req.query;
 
   try {
-    // Import database connection
-    const { engine } = await import('../../db_control/connect_azure');
-    const { Items } = await import('../../db_control/mymodels');
-    const { sessionmaker } = await import('sqlalchemy.orm');
-
-    const Session = sessionmaker(bind=engine);
-    const session = Session();
+    // SQLiteデータベースを使用（シンプルな実装）
+    const sqlite3 = require('sqlite3').verbose();
+    const path = require('path');
     
-    const item = await session.query(Items).filter(Items.item_id == itemCode).first();
-    session.close();
+    const dbPath = path.join(process.cwd(), 'db_control', 'CRM.db');
+    const db = new sqlite3.Database(dbPath);
 
-    if (!item) {
-      return res.status(404).json({ detail: "商品がマスタ未登録です" });
-    }
+    db.get(
+      'SELECT item_id, item_name, price FROM items WHERE item_id = ?',
+      [itemCode],
+      (err, row) => {
+        db.close();
+        
+        if (err) {
+          console.error('Database error:', err);
+          return res.status(500).json({ detail: "データベースエラーが発生しました" });
+        }
+        
+        if (!row) {
+          return res.status(404).json({ detail: "商品がマスタ未登録です" });
+        }
 
-    res.status(200).json({
-      item_id: item.item_id,
-      item_name: item.item_name,
-      price: item.price
-    });
+        res.status(200).json({
+          item_id: row.item_id,
+          item_name: row.item_name,
+          price: row.price
+        });
+      }
+    );
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({ detail: "商品検索でエラーが発生しました" });
